@@ -19,8 +19,10 @@ public class MyClassLoader extends ClassLoader {
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         System.out.println("Class Loading Started for " + name);
-        if (name.startsWith("Hello")) {
+        if (name.startsWith("com")) {
             return getClass(name);
+        }else if(name.startsWith("Hello")) {
+            return getClass_1(name);
         }
         return super.loadClass(name);
     }
@@ -42,7 +44,7 @@ public class MyClassLoader extends ClassLoader {
         byte[] byteArr = null;
         try {
             // This loads the byte code data from the file
-            byteArr = loadClassData_1(file);
+            byteArr = loadClassData(file);
             System.out.println("Size of byte array "+byteArr.length);
             Class<?> c = defineClass(name, byteArr, 0, byteArr.length);
             resolveClass(c);
@@ -73,11 +75,38 @@ public class MyClassLoader extends ClassLoader {
         in.close();
         return buff;
     }
+    /**
+     * Loading of class from .class file
+     * happens here You Can modify logic of
+     * this method to load Class
+     * from Network or any other source
+     * @param name
+     * @return
+     * @throws ClassNotFoundException
+     */
+    private Class<?> getClass_1(String name) throws ClassNotFoundException {
+        System.out.println("*********Inside getClass*********");
+
+        String file = name.replace('.', File.separatorChar) + ".class";
+        System.out.println("Name of File: " + file);
+        byte[] byteArr = null;
+        try {
+            // This loads the byte code data from the file
+            byteArr = loadClassData_1(file);
+            System.out.println("Size of byte array "+byteArr.length);
+            Class<?> c = defineClass(name, byteArr, 0, byteArr.length);
+            resolveClass(c);
+            return c;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
     private byte[] loadClassData_1(String name) throws IOException, ClassNotFoundException {
 
         System.out.println("<<<<<<<<<Inside loadClassData>>>>>>");
         try {
-            byte[] bytes = FileUtils.readFileToByteArray(new File("/Users/***/IdeaProjects/CustomClassLoader/src/main/java/com/main/Hello.xlass"));
+            byte[] bytes = FileUtils.readFileToByteArray(new File("/Users/i320572/IdeaProjects/CustomClassLoader/src/main/java/com/main/Hello.xlass"));
             for(int i=0; i<bytes.length; i++) {
                 bytes[i] = (byte)(255 - (int)bytes[i]);
             }
@@ -95,12 +124,16 @@ public class MyClassLoader extends ClassLoader {
 
         //This Loads the Class we must always.
         //provide binary name of the class
-        //Class<?> clazz = loader.loadClass("com.ccl.ccl");
-        Class<?> clazz = loader.loadClass("Hello");
+        Class<?> clazz = loader.loadClass("com.ccl.ccl");
         System.out.println("Loaded class name: " + clazz.getName());
-
         //Create instance Of the Class and invoke the particular method
         Object instance = clazz.newInstance();
-        clazz.getMethod("hello").invoke(instance);
+        clazz.getMethod("printMyName").invoke(instance);
+
+        Class<?> clazz_1 = loader.loadClass("Hello");
+        System.out.println("Loaded class name: " + clazz_1.getName());
+        //Create instance Of the Class and invoke the particular method
+        Object instance_1 = clazz_1.newInstance();
+        clazz_1.getMethod("hello").invoke(instance_1);
     }
 }
