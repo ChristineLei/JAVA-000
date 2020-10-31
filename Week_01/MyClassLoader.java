@@ -106,7 +106,7 @@ public class MyClassLoader extends ClassLoader {
 
         System.out.println("<<<<<<<<<Inside loadClassData>>>>>>");
         try {
-            byte[] bytes = FileUtils.readFileToByteArray(new File("/Users/i320572/IdeaProjects/CustomClassLoader/src/main/java/com/main/Hello.xlass"));
+            byte[] bytes = FileUtils.readFileToByteArray(new File("./src/main/java/com/main/Hello.xlass"));
             for(int i=0; i<bytes.length; i++) {
                 bytes[i] = (byte)(255 - (int)bytes[i]);
             }
