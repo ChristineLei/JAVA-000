@@ -3,70 +3,78 @@ package nio.gateway.outbound.okhttp;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.*;
+import nio.gateway.outbound.httpclient4.NamedThreadFactory;
 import okhttp3.*;
-import org.apache.http.HttpEntity;
-import org.apache.http.util.EntityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 
-import static io.netty.handler.codec.http.HttpResponseStatus.NO_CONTENT;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 public class OkhttpOutboundHandler {
+    private final static Logger log = LoggerFactory.getLogger(OkhttpOutboundHandler.class);
+
     private String backendUrl;
-    private OkHttpClient okclient;
+    private ExecutorService proxyService;
+    private OkHttpClient okClient;
 
     public OkhttpOutboundHandler(String backendUrl) {
-        this.backendUrl = backendUrl.endsWith("/") ? backendUrl.substring(0, backendUrl.length() - 1) : backendUrl;
-        this.okclient = new OkHttpClient();
+        this.backendUrl = backendUrl.endsWith("/")?backendUrl.substring(0,backendUrl.length()-1):backendUrl;
+        int cores = Runtime.getRuntime().availableProcessors() * 2;
+        long keepAliveTime = 1000;
+        int queueSize = 2048;
+        RejectedExecutionHandler handler = new ThreadPoolExecutor.CallerRunsPolicy();//.DiscardPolicy();
+        proxyService = new ThreadPoolExecutor(cores, cores,
+                keepAliveTime, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(queueSize),
+                new NamedThreadFactory("proxyService"), handler);
+
+        okClient = new OkHttpClient.Builder()
+                .callTimeout(10, TimeUnit.SECONDS)
+                .connectTimeout(1, TimeUnit.SECONDS)
+                .build();
     }
 
     public void handle(FullHttpRequest fullRequest, ChannelHandlerContext ctx) throws IOException {
+        log.debug("req uri : {}", fullRequest.uri());
         final String url = this.backendUrl + fullRequest.uri();
-        Request request = new Request.Builder().url(url).build();
-        try (Response response = okclient.newCall(request).execute()) {
-            handleResponse(fullRequest,ctx,response);
-        }  catch (Exception e) {
-            e.printStackTrace();
-        }
+        proxyService.submit(() -> fetchGet(fullRequest,ctx, url));
     }
-    private void handleResponse(final FullHttpRequest fullRequest, final ChannelHandlerContext ctx, final Response endpointResponse) throws Exception {
+    private void fetchGet(final FullHttpRequest inbound, final ChannelHandlerContext ctx, final String url) {
+        HttpHeaders headers = inbound.headers();
+        Request req = new Request.Builder().url(url).build();
+        headers.forEach(item -> req.newBuilder().header(item.getKey(), item.getValue()));
+
+        okClient.newCall(req).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                e.printStackTrace();
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if(!response.isSuccessful()) {
+                    throw new IOException("Unexpected code " + response);
+                }else {
+                    handleResponse(ctx, response);
+                }
+            }
+        });
+    }
+
+    private void handleResponse(final ChannelHandlerContext ctx, final Response resp) {
         FullHttpResponse response = null;
         try {
-//            String value = "hello,kimmking";
-//            response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(value.getBytes("UTF-8")));
-//            response.headers().set("Content-Type", "application/json");
-//            response.headers().setInt("Content-Length", response.content().readableBytes());
-
-
-            //byte[] body = EntityUtils.toByteArray(endpointResponse.getEntity());
-            byte[] body = EntityUtils.toByteArray((HttpEntity) endpointResponse.body());
-//            System.out.println(new String(body));
-//            System.out.println(body.length);
-
-            response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(body));
+            response = new DefaultFullHttpResponse(HTTP_1_1, OK, Unpooled.wrappedBuffer(resp.body().bytes()));
             response.headers().set("Content-Type", "application/json");
-            //response.headers().setInt("Content-Length", Integer.parseInt(endpointResponse.getFirstHeader("Content-Length").getValue()));
-            response.headers().setInt("Content-Length", Integer.parseInt(String.valueOf(endpointResponse.headers("Content-Length"))));
-
-//            for (Header e : endpointResponse.getAllHeaders()) {
-//                //response.headers().set(e.getName(),e.getValue());
-//                System.out.println(e.getName() + " => " + e.getValue());
-//            }
-
+            response.headers().setInt("Content-Length", Integer.parseInt(resp.header("Content-Length", "0")));
         } catch (Exception e) {
             e.printStackTrace();
-            response = new DefaultFullHttpResponse(HTTP_1_1, NO_CONTENT);
-            exceptionCaught(ctx, e);
         } finally {
-            if (fullRequest != null) {
-                if (!HttpUtil.isKeepAlive(fullRequest)) {
+            if (response != null) {
+                if (!HttpUtil.isKeepAlive(response)) {
                     ctx.write(response).addListener(ChannelFutureListener.CLOSE);
                 } else {
                     //response.headers().set(CONNECTION, KEEP_ALIVE);
@@ -74,13 +82,7 @@ public class OkhttpOutboundHandler {
                 }
             }
             ctx.flush();
-            //ctx.close();
         }
 
-    }
-
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
-        ctx.close();
     }
 }

@@ -5,6 +5,7 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
+import nio.gateway.filter.HeadFilter;
 import nio.gateway.outbound.httpclient4.HttpOutboundHandler;
 import nio.gateway.outbound.okhttp.OkhttpOutboundHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -28,6 +29,7 @@ public class HttpInboundHandler extends ChannelInboundHandlerAdapter {
     private final String proxyServer;
     //private HttpOutboundHandler handler;
     private OkhttpOutboundHandler handler;
+    private HeadFilter headft;
 
     public HttpInboundHandler(String proxyServer) {
         this.proxyServer = proxyServer;
@@ -56,6 +58,7 @@ public class HttpInboundHandler extends ChannelInboundHandlerAdapter {
 //                ReferenceCountUtil.release(msg);
 //        }
         FullHttpRequest fullRequest = (FullHttpRequest) msg;
+        headft.filter(fullRequest,ctx);
         try{
             handler.handle(fullRequest,ctx);
         } catch(Exception e) {
