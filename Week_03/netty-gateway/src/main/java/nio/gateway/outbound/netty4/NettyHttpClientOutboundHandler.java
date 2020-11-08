@@ -24,12 +24,12 @@ public class NettyHttpClientOutboundHandler  extends ChannelInboundHandlerAdapte
         messageBuffer.writeBytes(sendMessage.getBytes());
         ctx.write(messageBuffer);
         ctx.flush();
-        ctx.close();
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        DefaultFullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, OK, (ByteBuf) msg);
-        ctx.write(response);
+        ByteBuf readMessage = (ByteBuf) msg;
+        System.out.println("NettyClientHandler channelRead : " + readMessage.toString(Charset.defaultCharset()));
+        ctx.writeAndFlush("Acknowledged");
     }
 }
