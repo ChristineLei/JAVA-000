@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 import static io.netty.handler.codec.http.HttpHeaderValues.KEEP_ALIVE;
 import static io.netty.handler.codec.http.HttpHeaderNames.CONNECTION;
@@ -26,12 +27,12 @@ import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 public class HttpInboundHandler extends ChannelInboundHandlerAdapter {
 
     private static Logger logger = LoggerFactory.getLogger(HttpInboundHandler.class);
-    private final String proxyServer;
+    private final List<String> proxyServer;
     //private HttpOutboundHandler handler;
     private OkhttpOutboundHandler handler;
     private HeadFilter headft;
 
-    public HttpInboundHandler(String proxyServer) {
+    public HttpInboundHandler(List<String> proxyServer) {
         this.proxyServer = proxyServer;
         //handler = new HttpOutboundHandler(this.proxyServer);
         handler = new OkhttpOutboundHandler(this.proxyServer);

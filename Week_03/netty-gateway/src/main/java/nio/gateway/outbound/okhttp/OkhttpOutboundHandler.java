@@ -5,11 +5,13 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
 import nio.gateway.outbound.httpclient4.NamedThreadFactory;
+import nio.gateway.router.UriRouter;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.*;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
@@ -22,7 +24,10 @@ public class OkhttpOutboundHandler {
     private ExecutorService proxyService;
     private OkHttpClient okClient;
 
-    public OkhttpOutboundHandler(String backendUrl) {
+    public OkhttpOutboundHandler(List<String> endpoints) {
+        //router
+        UriRouter httpEndpointRouter = new UriRouter();
+        String backendUrl = httpEndpointRouter.route(endpoints);
         this.backendUrl = backendUrl.endsWith("/")?backendUrl.substring(0,backendUrl.length()-1):backendUrl;
         int cores = Runtime.getRuntime().availableProcessors() * 2;
         long keepAliveTime = 1000;

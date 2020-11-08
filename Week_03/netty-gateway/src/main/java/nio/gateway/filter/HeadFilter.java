@@ -9,7 +9,7 @@ public class HeadFilter implements HttpRequestFilter {
     private static Logger logger = LoggerFactory.getLogger(HeadFilter.class);
     @Override
     public void filter(FullHttpRequest fullRequest, ChannelHandlerContext ctx) {
-        fullRequest.headers().add("nio","clei");
+        fullRequest.headers().set("nio","clei");
         logger.info("add nio info to request header");
     }
 }
