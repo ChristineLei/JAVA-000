@@ -1,29 +1,33 @@
 package com.main;
 
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 
-public class SemaphoreDemo {
-
-    public static void main(String[] args) throws InterruptedException {
+public class CyclicBarrierDemo {
+    public static void main(String[] args) {
         long start=System.currentTimeMillis();
-        // 在这里创建一个线程或线程池，
-        final Semaphore semaphore = new Semaphore(1);
+        CyclicBarrier cyclicBarrier = new CyclicBarrier(1, new Runnable() {
+            @Override
+            public void run() {
+                System.out.println("回调>>"+Thread.currentThread().getName());
+                System.out.println("回调>>线程组执行结束");
+            }
+        });
         new Runnable(){
             public void run(){
+                synchronized (this){
                     try {
-                        semaphore.acquire();
                         int result = sum();
-                        semaphore.release();
                         System.out.println("异步计算结果为："+result);
                         System.out.println("使用时间："+ (System.currentTimeMillis()-start) + " ms");
-                    } catch (InterruptedException e) {
+                        cyclicBarrier.await();
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
+                }
             }
         }.run();
-        semaphore.release();
     }
-
     private static int sum() {
         return fibo(36);
     }
