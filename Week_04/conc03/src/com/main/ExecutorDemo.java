@@ -1,11 +1,9 @@
 package com.main;
 
-import java.lang.management.ThreadInfo;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
-public class NewCachedThreadPoolDemo {
+public class ExecutorDemo {
     public static void main(String[] args) {
         long start=System.currentTimeMillis();
         ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.newCachedThreadPool();

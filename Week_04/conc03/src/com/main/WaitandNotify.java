@@ -4,19 +4,19 @@ public class WaitandNotify {
 
     public static void main(String[] args) {
         long start=System.currentTimeMillis();
-        CalThread cal = new CalThread();
-        cal.start();
-        synchronized (cal) {
+        Task task = new Task();
+        task.start();
+        synchronized (task) {
             try{
-                cal.wait();
+                task.wait();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            System.out.println("异步计算结果为："+cal.result);
+            System.out.println("异步计算结果为："+task.result);
             System.out.println("使用时间："+ (System.currentTimeMillis()-start) + " ms");
         }
     }
-    static class CalThread extends Thread{
+    static class Task extends Thread{
         int result;
         @Override
         public void run() {

@@ -1,24 +1,33 @@
 package com.main;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class CountDownLatchDemo {
-    public static void main(String[] args) throws InterruptedException {
-        CountDownLatch countDownLatch = new CountDownLatch(1);
+    private final static int threadCount = 1;
+    public static void main(String[] args) throws Exception {
         long start=System.currentTimeMillis();
-        // 在这里创建一个线程或线程池，
-        new Runnable(){
-            public void run(){
-                synchronized (this){
+        ExecutorService exec = Executors.newCachedThreadPool();
+        final CountDownLatch countDownLatch = new CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            final int threadNum = i;
+            exec.execute(() -> {
+                try {
                     int result = sum();
                     System.out.println("异步计算结果为："+result);
                     System.out.println("使用时间："+ (System.currentTimeMillis()-start) + " ms");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
                     countDownLatch.countDown();
                 }
-            }
-        }.run();
+            });
+        }
         countDownLatch.await();
-
+        exec.shutdown();
     }
 
     private static int sum() {

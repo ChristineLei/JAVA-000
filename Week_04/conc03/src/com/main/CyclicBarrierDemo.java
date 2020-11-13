@@ -4,29 +4,36 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
 public class CyclicBarrierDemo {
+    private final static int threadCount = 1;
     public static void main(String[] args) {
         long start=System.currentTimeMillis();
-        CyclicBarrier cyclicBarrier = new CyclicBarrier(1, new Runnable() {
-            @Override
-            public void run() {
-                System.out.println("回调>>"+Thread.currentThread().getName());
-                System.out.println("回调>>线程组执行结束");
+        CyclicBarrier cyclicBarrier = new CyclicBarrier(threadCount);
+        for (int i = 0; i < threadCount; i++) {
+            new Task(cyclicBarrier,start).start();
+        }
+    }
+    private static class Task extends Thread {
+        int result;
+        long start;
+        private CyclicBarrier cyclicBarrier;
+
+        public Task(CyclicBarrier cyclicBarrier, long start) {
+            this.cyclicBarrier = cyclicBarrier;
+            this.start = start;
+        }
+        @Override
+        public void run() {
+            try {
+                result = sum();
+                System.out.println("异步计算结果为："+result);
+                System.out.println("使用时间："+ (System.currentTimeMillis()-start) + " ms");
+                cyclicBarrier.await();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (BrokenBarrierException e) {
+                e.printStackTrace();
             }
-        });
-        new Runnable(){
-            public void run(){
-                synchronized (this){
-                    try {
-                        int result = sum();
-                        System.out.println("异步计算结果为："+result);
-                        System.out.println("使用时间："+ (System.currentTimeMillis()-start) + " ms");
-                        cyclicBarrier.await();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }.run();
+        }
     }
     private static int sum() {
         return fibo(36);
