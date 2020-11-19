@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                        http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+                        http://www.springframework.org/schema/context
+                        http://www.springframework.org/schema/context/spring-context-3.2.xsd">
+
+    <bean id="triangle" class="io.clei.java0.springdemo01.Triangle">
+        <property name="points">
+            <list>
+                <ref bean="point0"/>
+                <ref bean="point1"/>
+                <ref bean="point2"/>
+            </list>
+        </property>
+
+    </bean>
+    <bean id="point0" class="io.clei.java0.springdemo01.Point">
+        <qualifier value="circleRelated"/>
+        <property name="x" value="0"/>
+        <property name="y" value="0"/>
+    </bean>
+    <bean id="point1" class="io.clei.java0.springdemo01.Point">
+        <property name="x" value="20"/>
+        <property name="y" value="0"/>
+    </bean>
+    <bean id="point2" class="io.clei.java0.springdemo01.Point">
+        <property name="x" value="0"/>
+        <property name="y" value="20"/>
+    </bean>
+    <bean id="drawing" class="io.clei.java0.springdemo01.Drawing"/>
+    <bean class="io.clei.java0.springdemo01.DisplayNameBeanPostProcessor"/>
+
+    <bean id="circle" class="io.clei.java0.springdemo01.Circle">
+    </bean>
+
+    <context:component-scan base-package="io.clei.java0.springdemo01" />
+
+</beans>
