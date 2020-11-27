@@ -1,29 +1,30 @@
-CREATE TABLE customer (
+TABLE customer (
   `customerId` INT NOT NULL AUTO_INCREMENT,
   `customerName` VARCHAR(45) NOT NULL,
     `customerPhone` INT NULL,
-  `customerEmail` VARCHAR(45) NOT NULL,
-  `customerAddress` VARCHAR(45) NOT NULL,
-  `customerState` VARCHAR(45) NULL,
-  `customerCity` VARCHAR(45) NOT NULL,
+    `customerAddress` VARCHAR(45) NOT NULL,
+  `customerDistrict` VARCHAR(45) NOT NULL,
+  `customerCity` VARCHAR(45) NULL,
+  `customerProvince` VARCHAR(45) NOT NULL,
   `customerPassword` VARCHAR(45) NULL,
   PRIMARY KEY (`customerId`),
-  UNIQUE INDEX `customerPhone_UNIQUE` (`customerPhone` ASC),
+  UNIQUE INDEX `customerPhone_UNIQUE` (`customerPhone` ASC));
 COMMENT = 'stores customer data';
-
 
 CREATE TABLE `category` (
   `categoryName` VARCHAR(45) NOT NULL,
   `categoryDetails` VARCHAR(45) NULL,
   PRIMARY KEY (`categoryName`));
-  
-  
+   
   CREATE TABLE `supplier` (
   `supplierId` INT NOT NULL AUTO_INCREMENT,
   `supplierName` VARCHAR(45) NOT NULL,
   `supplierAddress` VARCHAR(45) NOT NULL,
   `supplierPhone` INT NOT NULL,
-  `supplierEmail` VARCHAR(45) NOT NULL,
+  `URL` VARCHAR(45) NOT NULL,
+  `customerId` INT NOT NULL AUTO_INCREMENT,
+  `discountType` VARCHAR(45) NOT NULL,
+  `discountAvailable` VARCHAR(45) NOT NULL,
   PRIMARY KEY (`supplierid`));
   
   CREATE TABLE `product` (
@@ -34,8 +35,21 @@ CREATE TABLE `category` (
   `productQuantity` INT NULL,
   `productPrice` INT NULL,
   `supplierId` INT NULL,
-  PRIMARY KEY (`productId`),
+  `productDescription) VARCHAR(45) NULL,
+  `discount` INT NULL,
+  PRIMARY KEY (`productId`));
   COMMENT = 'Contain details of products ';
+
+CREATE TABLE `orderDetail` (
+  `orderId` INT NOT NULL AUTO_INCREMENT,
+  `productId` INT NOT NULL,
+  `orderNumber` VARCHAR(45) NOT NULL,
+  `price` VARCHAR(45) NOT NULL,
+  `quantity` VARCHAR(45) NOT NULL,
+  `discount` VARCHAR(45) NOT NULL,
+  `shippedDate` VARCHAR(45) NOT NULL
+  PRIMARY KEY (`orderId`))
+COMMENT = 'stores the details of order placed by customer';
 
 CREATE TABLE `order` (
   `orderId` INT NOT NULL AUTO_INCREMENT,
@@ -43,6 +57,10 @@ CREATE TABLE `order` (
   `customerId` INT NOT NULL,
   `orderStatus` VARCHAR(45) NOT NULL,
   `shipmentId` INT NOT NULL,
+  `orderNumber` VARCHAR(45) NOT NULL,
+  `shippedDate` VARCHAR(45) NOT NULL,
+  `paymentdate` VARCHAR(45) NOT NULL,
+  `orderDate` VARCHAR(45) NOT NULL
   PRIMARY KEY (`orderId`))
 COMMENT = 'stores the details of order placed by customer';
 
