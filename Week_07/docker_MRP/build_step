@@ -1,0 +1,276 @@
+1, Pulling Mysql Server Image
+docker pull mysql/mysql-server:5.7
+$ docker images
+REPOSITORY           TAG                 IMAGE ID            CREATED             SIZE
+mysql/mysql-server   5.7                 2a6c84ecfcb2        10 months ago       334MB
+2, Create a Docker network
+$ docker network create groupnet
+$ docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+6f10578c3a54        bridge              bridge              local
+c08c3baed151        groupnet            bridge              local
+5a3c1ef8f29d        host                host                local
+8cdfa66dbcd4        none                null                local
+3,Running 3 Docker MySQL containers
+for multi-primary mode:
+$ for N in 1 2 3
+> do docker run -d --name=node$N --net=groupnet --hostname=node$N \
+>   -v $PWD/d$N:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=mypass \
+>   mysql/mysql-server:5.7 \
+>   --server-id=$N \
+>   --log-bin='mysql-bin-1.log' \
+>   --enforce-gtid-consistency='ON' \
+>   --log-slave-updates='ON' \
+>   --gtid-mode='ON' \
+>   --transaction-write-set-extraction='XXHASH64' \
+>   --binlog-checksum='NONE' \
+>   --master-info-repository='TABLE' \
+>   --relay-log-info-repository='TABLE' \
+>   --plugin-load='group_replication.so' \
+>   --relay-log-recovery='ON' \
+>   --group-replication-start-on-boot='OFF' \
+>   --group-replication-group-name='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' \
+>   --group-replication-local-address="node$N:33061" \
+>   --group-replication-group-seeds='node1:33061,node2:33061,node3:33061' \
+>   --loose-group-replication-single-primary-mode='OFF' \
+>   --loose-group-replication-enforce-update-everywhere-checks='ON'
+> done
+for single primary mode:
+change the loose-group-replication-single-primary-mode and loose-group-replication-enforce-update-everywhere-checks values to ‘ON’ and ‘OFF’ respectively
+-v $PWD/d$N:/var/lib/mysql: It sets up a mount volume that links the /var/lib/mysql directory from inside the node container to the  $PWD/d$N  directory on the host machine.
+
+$ docker ps -a
+CONTAINER ID        IMAGE                    COMMAND                  CREATED             STATUS                            PORTS                 NAMES
+b871fc7d745c        mysql/mysql-server:5.7   "/entrypoint.sh --se…"   6 seconds ago       Up 2 seconds (health: starting)   3306/tcp, 33060/tcp   node3
+34e18f70fb3c        mysql/mysql-server:5.7   "/entrypoint.sh --se…"   8 seconds ago       Up 6 seconds (health: starting)   3306/tcp, 33060/tcp   node2
+c0fab535bac2        mysql/mysql-server:5.7   "/entrypoint.sh --se…"   9 seconds ago       Up 8 seconds (health: starting)   3306/tcp, 33060/tcp   node1
+wait a few minutes:
+$ docker ps
+CONTAINER ID        IMAGE                    COMMAND                  CREATED             STATUS                   PORTS                 NAMES
+b871fc7d745c        mysql/mysql-server:5.7   "/entrypoint.sh --se…"   6 minutes ago       Up 6 minutes (healthy)   3306/tcp, 33060/tcp   node3
+34e18f70fb3c        mysql/mysql-server:5.7   "/entrypoint.sh --se…"   6 minutes ago       Up 6 minutes (healthy)   3306/tcp, 33060/tcp   node2
+c0fab535bac2        mysql/mysql-server:5.7   "/entrypoint.sh --se…"   7 minutes ago       Up 7 minutes (healthy)   3306/tcp, 33060/tcp   node1
+
+if some problem happends,  check the Mysql Logs: $ docker logs node1
+
+4, Setting up and starting GR in the containers
+node1:
+$ docker exec -it node1 mysql -uroot -pmypass \
+>   -e "SET @@GLOBAL.group_replication_bootstrap_group=1;" \
+>   -e "create user 'repl'@'%';" \
+>   -e "GRANT REPLICATION SLAVE ON *.* TO repl@'%';" \
+>   -e "flush privileges;" \
+>   -e "change master to master_user='repl' for channel 'group_replication_recovery';" \
+>   -e "START GROUP_REPLICATION;" \
+>   -e "SET @@GLOBAL.group_replication_bootstrap_group=0;" \
+>   -e "SELECT * FROM performance_schema.replication_group_members;"
+mysql: [Warning] Using a password on the command line interface can be insecure.
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| CHANNEL_NAME              | MEMBER_ID                            | MEMBER_HOST | MEMBER_PORT | MEMBER_STATE |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| group_replication_applier | e25a081a-33ab-11eb-b0d1-0242ac130002 | node1       |        3306 | ONLINE       |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+node2, node3:
+$ for N in 2 3
+> do docker exec -it node$N mysql -uroot -pmypass \
+>   -e "change master to master_user='repl' for channel 'group_replication_recovery';" \
+>   -e "START GROUP_REPLICATION;"
+> done
+
+Use the Performance Schema tables to monitor GR:
+$ docker exec -it node1 mysql -uroot -pmypass \
+>   -e "SELECT * FROM performance_schema.replication_group_members;"
+mysql: [Warning] Using a password on the command line interface can be insecure.
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| CHANNEL_NAME              | MEMBER_ID                            | MEMBER_HOST | MEMBER_PORT | MEMBER_STATE |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| group_replication_applier | e25a081a-33ab-11eb-b0d1-0242ac130002 | node1       |        3306 | ONLINE       |
+| group_replication_applier | e49fd907-33ab-11eb-b15f-0242ac130003 | node2       |        3306 | ONLINE       |
+| group_replication_applier | e80a7a00-33ab-11eb-b260-0242ac130004 | node3       |        3306 | ONLINE       |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+
+5, Adding some data
+
+session1:
+$ docker exec -it node1 mysql -uroot -pmypass \
+>   -e "create database TEST; use TEST; CREATE TABLE t1 (id INT NOT NULL PRIMARY KEY) ENGINE=InnoDB; show tables;"
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----------------+
+| Tables_in_test |
++----------------+
+| t1             |
++----------------+
+session2:
+docker exec -it node2 mysql -uroot -pmypass \
+  -e "INSERT INTO TEST.t1 VALUES(2);"
+
+session3:
+docker exec -it node3 mysql -uroot -pmypass \
+  -e "INSERT INTO TEST.t1 VALUES(3);"
+
+6, check state
+$ for N in 1 2 3
+> do docker exec -it node$N mysql -uroot -pmypass \
+>   -e "SHOW VARIABLES WHERE Variable_name = 'hostname';" \
+>   -e "SELECT * FROM TEST.t1;"
+> done
+mysql: [Warning] Using a password on the command line interface can be insecure.
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| hostname      | node1 |
++---------------+-------+
++----+
+| id |
++----+
+|  2 |
+|  3 |
++----+
+mysql: [Warning] Using a password on the command line interface can be insecure.
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| hostname      | node2 |
++---------------+-------+
++----+
+| id |
++----+
+|  2 |
+|  3 |
++----+
+mysql: [Warning] Using a password on the command line interface can be insecure.
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| hostname      | node3 |
++---------------+-------+
++----+
+| id |
++----+
+|  2 |
+|  3 |
++----+
+
+7, GR fault tolerance scenarios
+
+set node3 looses connectivity:
+$ docker exec -it node3 mysql -uroot -pmypass
+mysql> set @@global.group_replication_exit_state_action=READ_ONLY;
+Query OK, 0 rows affected (0.00 sec)
+$ docker network disconnect groupnet node3
+$ docker exec -it node3 mysql -uroot -pmypass
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 110
+Server version: 5.7.29-log MySQL Community Server (GPL)
+
+Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> SHOW VARIABLES WHERE Variable_name = 'hostname';
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| hostname      | node3 |
++---------------+-------+
+1 row in set (0.01 sec)
+
+mysql> SELECT * FROM performance_schema.replication_group_members;
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| CHANNEL_NAME              | MEMBER_ID                            | MEMBER_HOST | MEMBER_PORT | MEMBER_STATE |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| group_replication_applier | e25a081a-33ab-11eb-b0d1-0242ac130002 | node1       |        3306 | UNREACHABLE  |
+| group_replication_applier | e49fd907-33ab-11eb-b15f-0242ac130003 | node2       |        3306 | UNREACHABLE  |
+| group_replication_applier | e80a7a00-33ab-11eb-b260-0242ac130004 | node3       |        3306 | ONLINE       |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+3 rows in set (0.01 sec)
+
+session1: 
+$ docker exec -it node1 mysql -uroot -pmypass
+mysql> SHOW VARIABLES WHERE Variable_name = 'hostname';"
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| hostname      | node1 |
++---------------+-------+
+1 row in set (0.02 sec)
+mysql> SELECT * FROM performance_schema.replication_group_members;
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| CHANNEL_NAME              | MEMBER_ID                            | MEMBER_HOST | MEMBER_PORT | MEMBER_STATE |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| group_replication_applier | e25a081a-33ab-11eb-b0d1-0242ac130002 | node1       |        3306 | ONLINE       |
+| group_replication_applier | e49fd907-33ab-11eb-b15f-0242ac130003 | node2       |        3306 | ONLINE       |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+2 rows in set (0.00 sec)
+
+reestablish the network connection in node3 and join the node:
+$ docker network connect groupnet node3
+$ docker exec -it node3 mysql -uroot -pmypass
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 115
+Server version: 5.7.29-log MySQL Community Server (GPL)
+
+Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> STOP GROUP_REPLICATION;
+Query OK, 0 rows affected (6.02 sec)
+
+mysql> START GROUP_REPLICATION;
+Query OK, 0 rows affected (3.12 sec)
+
+mysql> SHOW VARIABLES WHERE Variable_name = 'hostname';
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| hostname      | node3 |
++---------------+-------+
+1 row in set (0.01 sec)
+
+mysql>  SELECT * FROM performance_schema.replication_group_members;
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| CHANNEL_NAME              | MEMBER_ID                            | MEMBER_HOST | MEMBER_PORT | MEMBER_STATE |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| group_replication_applier | e25a081a-33ab-11eb-b0d1-0242ac130002 | node1       |        3306 | ONLINE       |
+| group_replication_applier | e49fd907-33ab-11eb-b15f-0242ac130003 | node2       |        3306 | ONLINE       |
+| group_replication_applier | e80a7a00-33ab-11eb-b260-0242ac130004 | node3       |        3306 | ONLINE       |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+3 rows in set (0.00 sec)
+
+session1: 
+mysql> SHOW VARIABLES WHERE Variable_name = 'hostname';
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| hostname      | node1 |
++---------------+-------+
+1 row in set (0.01 sec)
+
+mysql>  SELECT * FROM performance_schema.replication_group_members;
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| CHANNEL_NAME              | MEMBER_ID                            | MEMBER_HOST | MEMBER_PORT | MEMBER_STATE |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+| group_replication_applier | e25a081a-33ab-11eb-b0d1-0242ac130002 | node1       |        3306 | ONLINE       |
+| group_replication_applier | e49fd907-33ab-11eb-b15f-0242ac130003 | node2       |        3306 | ONLINE       |
+| group_replication_applier | e80a7a00-33ab-11eb-b260-0242ac130004 | node3       |        3306 | ONLINE       |
++---------------------------+--------------------------------------+-------------+-------------+--------------+
+3 rows in set (0.00 sec)
+
+8,Cleaning up: stopping containers, removing created network and image
+
+$ docker stop node1 node2 node3
+$ docker rm node1 node2 node3
+$ sudo rm -rf d1 d2 d3
+$ docker network rm groupnet
+$ docker rmi mysql/mysql-server:5.7
