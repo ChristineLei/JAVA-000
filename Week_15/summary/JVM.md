@@ -1,4 +1,4 @@
-## JVM
+### JVM
 
 - 字节码
 - 类加载器
@@ -11,4 +11,4 @@
 
 ![](https://i.loli.net/2021/02/04/tNCbSEvFy9l623n.png)
 
-![](/Users/i320572/Documents/summary/jvm/JVM_tuning.png)
+![](https://i.loli.net/2021/02/06/C8Wz7nhZRQVGgjO.png)
